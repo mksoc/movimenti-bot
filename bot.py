@@ -8,6 +8,34 @@ import datetime
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
                      level=logging.INFO)
 
+def convert_to_date(date_text):
+    try:
+        date = datetime.datetime.strptime(date_text, '%d/%m/%y')
+    except ValueError:
+        try:
+            date = datetime.datetime.strptime(date_text, '%d/%m/%Y')
+        except:
+            return None
+    return date
+
+def get_date(field=None):
+    today = datetime.datetime.now()
+
+    if field is None:
+        date = today
+    else:
+        candidate = convert_to_date(field)
+        if (
+            candidate is None or
+            candidate > today or
+            candidate.year != today.year
+            ):
+            date = today
+        else:
+            date = candidate
+
+    return date.strftime('%d/%m/%Y')
+
 def start(update, context):
     context.bot.send_message(chat_id=update.effective_chat.id, text="""
 Ciao! Sono un bot che ti aiuta a registrare i tuoi movimenti. Usami per aggiungere le tue spese!
@@ -21,14 +49,18 @@ Per iniziare, mandami un messaggio con i seguenti campi (separati da virgole):
 """)
 
 def spesa(update, context):
-    # Get date in the format dd/mm/yy
-    date = datetime.datetime.now()
-    date = date.strftime('%d/%m/%y')
+    # Split and format message fields
+    fields = [f.strip().upper() if len(f) < 3 else f.strip().capitalize() for f in update.message.text.split(',')]
+
+    # Set date
+    if len(fields) == 4:
+        fields.insert(0, get_date())
+    elif len(fields) == 5:
+        fields[0] = get_date(fields[0])
 
     # IFTTT bot expects a #spesa trigger, followed by the text input
     # '|||' separates the fields
-    formatted_text = update.message.text.replace(',', '|||')
-    ifttt_msg = f'#spesa {date} ||| {formatted_text}'
+    ifttt_msg = '#spesa ' + '|||'.join(fields)
 
     # Send the reply
     context.bot.send_message(chat_id=update.effective_chat.id, text=ifttt_msg)
